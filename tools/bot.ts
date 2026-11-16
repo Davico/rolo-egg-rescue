@@ -58,6 +58,7 @@ function nav(S: Sim, withEgg: boolean, gx: number, gy: number): Field {
       edge(a, b, Math.abs(dx) + Math.abs(y2 - y) * (y2 < y ? 1.5 : 0.4) + 1);
     }
     if (c >= '1' && c <= '9') for (let yy = 0; yy < rows; yy++) for (let xx = 0; xx < cols; xx++) if (g[yy][xx] === c && (xx !== x || yy !== y)) edge(a, xx + yy * cols, 1);
+    if (c === 'S' || c === 'Z') { const d = c === 'S' ? 1 : -1; for (let k = 4; k <= 9; k++) for (let y2 = Math.max(0, y - 7); y2 <= Math.min(rows - 1, y + 3); y2++) { const x2 = x + d * k; if (x2 >= 0 && x2 < cols && stand[x2 + y2 * cols]) edge(a, x2 + y2 * cols, 6); } }
     if (!withEgg && y + 1 < rows && g[y + 1][x] === 'R') for (let dx = 11; dx <= 17; dx++) if (x + dx < cols && stand[x + dx + y * cols]) edge(a, x + dx + y * cols, 8);
   }
   const d = new Float32Array(N).fill(1e6), done = new Uint8Array(N), goal = gx + gy * cols;
@@ -101,6 +102,8 @@ function rollout(base: Sim, C: Ctx, a: [number, number, number], b: [number, num
 
 /** Crate-and-plate doors: get behind the nearest crate and push it onto the plate. */
 function puzzle(S: Sim): [number, number, number] | null {
+  if (S.cat) return [0, 0, 0];                                     // on a catapult: wait for the throw
+  if (S.lv.boss && S.hasEgg && S.bossHp > 0 && S.wake <= 0 && S.stun <= 0 && S.dashCd <= 0 && Math.hypot(S.gx - S.px, S.gy - S.py) < 130 && Math.abs(S.gy - S.py) < 40) return [S.gx > S.px ? 1 : -1, 0, 1];  // boss: dash into her
   if (S.hasEgg) return null;
   // training wheel: stay on it and keep running until it launches; if we slipped past it to the locked gate, go back
   for (const r of S.rollers) {
@@ -135,7 +138,7 @@ function play(lv: LevelData, pw: Powers) {
     let best = -Infinity, pick = ACTS[0];
     for (const a of ACTS) { if (a[2] && !S.dash) continue; for (const b of ACTS) { if (b[2]) continue; const sc = rollout(S, C, a, b, N1, 40, 55) + (a[0] === 1 ? 20 : 0); if (sc > best) { best = sc; pick = a; } } }
     if (t - lastT > 480) { if (Math.hypot(S.px - lastX, S.py - lastY) < 20) unstick = 8; lastT = t; lastX = S.px; lastY = S.py; }
-    if (unstick > 0 && S.onR < 0) { unstick--; pick = [-1, unstick % 3 === 0 ? 1 : 0, 0]; }
+    if (unstick > 0 && S.onR < 0 && !(S.lv.boss && S.hasEgg)) { unstick--; pick = [-1, unstick % 3 === 0 ? 1 : 0, 0]; }
     const pz = puzzle(S); if (pz) pick = pz;
     if (process.env.DEBUG && t % 120 < N1) console.error((t * DT).toFixed(1), (S.px / T).toFixed(1), (S.py / T).toFixed(1), pick.join(), pz ? "PZ" : "", best.toFixed(0));
     const tries = S.tries;

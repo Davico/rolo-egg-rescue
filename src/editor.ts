@@ -6,7 +6,7 @@ import { EGGS, REG, TH, button, circ, ctx, drawEgg, drawStar, drawWorld, rr, tex
 
 export interface EditorApi { test: (lv: LevelData) => void; menu: () => void }
 
-const TOP = 44, BOT = 64, SLOTS = 6, ALLOWED = '.#^o+McRgFk123456789P*bX_D=|HE';
+const TOP = 44, BOT = 64, SLOTS = 6, ALLOWED = '.#^o+McRgFk123456789P*bX_D=|HELJmSZ';
 const TOOLS: { ch: string; tip: string }[] = [
   { ch: 'pan', tip: 'Move the view: drag the level (or use the arrow keys)' },
   { ch: '.', tip: 'Eraser' },
@@ -27,12 +27,16 @@ const TOOLS: { ch: string; tip: string }[] = [
   { ch: 'F', tip: 'Wind fan: blows you up' },
   { ch: 'R', tip: 'Training wheel: put 3 in a row, then a gate right after it' },
   { ch: 'g', tip: 'Wheel gate: draw a tall line right after the wheel' },
+  { ch: 'L', tip: 'Log stump: logs roll out to the left. Jump over them or land on top!' },
+  { ch: 'm', tip: 'Mole hole: the mole wakes up when the egg is taken' },
+  { ch: 'S', tip: 'Catapult: stand on it and it throws you to the right' },
+  { ch: 'Z', tip: 'Catapult: throws you to the left (for the way home)' },
   { ch: 'P', tip: 'Checkpoint flag' },
   { ch: '1', tip: 'Burrow: place two and they connect' },
   { ch: 'H', tip: 'Home nest: Rolo starts here' },
   { ch: 'E', tip: 'The egg: the owl sleeps next to it' },
 ];
-const ONCE = 'HEbX=|P1*';
+const ONCE = 'HEbX=|P1*LmSZ';
 const OWL = [{ n: 'Owl: slow', g: { base: 125, max: 210, gain: 0.2, wake: 1.2 } }, { n: 'Owl: normal', g: { base: 138, max: 230, gain: 0.22, wake: 1.0 } }, { n: 'Owl: fast', g: { base: 150, max: 250, gain: 0.24, wake: 0.9 } }];
 const EGG_ORDER: EggType[] = ['plain', 'feather', 'spark', 'stone'];
 
@@ -170,6 +174,9 @@ function icon(ch: string, x: number, y: number): void {
     case 'F': c.fillStyle = '#3a4656'; rr(x - 12, y - 2, 24, 14, 3); c.fill(); c.strokeStyle = '#9fe8ff'; c.lineWidth = 2; for (let i = -1; i <= 1; i++) { c.beginPath(); c.moveTo(x + i * 7, y - 4); c.lineTo(x + i * 7, y - 12); c.stroke(); } break;
     case 'R': c.fillStyle = '#2b3442'; rr(x - 13, y - 8, 26, 16, 3); c.fill(); c.fillStyle = '#ffd23f'; c.beginPath(); c.moveTo(x + 6, y - 5); c.lineTo(x - 4, y); c.lineTo(x + 6, y + 5); c.fill(); break;
     case 'g': c.fillStyle = '#ff4d6d'; c.fillRect(x - 3, y - 13, 6, 26); c.fillStyle = '#fff'; c.fillRect(x - 1, y - 13, 2, 26); break;
+    case 'L': circ(x, y, 13, '#5a3418'); circ(x, y, 10, '#b07a45'); circ(x, y, 4, '#7a4a26'); text('◀', x - 1, y - 9, 10, '#ffd23f'); break;
+    case 'm': c.fillStyle = '#5a3418'; c.beginPath(); c.ellipse(x, y + 10, 13, 7, 0, Math.PI, 0); c.fill(); c.fillStyle = '#4a3728'; c.beginPath(); c.ellipse(x, y + 4, 8, 11, 0, Math.PI, 0); c.fill(); c.fillStyle = '#e8b04a'; c.fillRect(x - 9, y - 6, 18, 4); break;
+    case 'S': case 'Z': { const d = ch === 'S' ? 1 : -1; c.strokeStyle = '#d9a15c'; c.lineWidth = 4; c.beginPath(); c.moveTo(x - d * 12, y + 8); c.lineTo(x + d * 12, y - 6); c.stroke(); c.fillStyle = '#6e4426'; c.beginPath(); c.moveTo(x - 5, y + 12); c.lineTo(x, y + 2); c.lineTo(x + 5, y + 12); c.fill(); circ(x + d * 10, y - 11, 4, '#8d959e'); break; }
     case 'P': c.fillStyle = '#f6ead2'; c.fillRect(x - 7, y - 12, 3, 24); c.fillStyle = '#3ddc68'; c.beginPath(); c.moveTo(x - 4, y - 12); c.lineTo(x + 11, y - 6); c.lineTo(x - 4, y); c.fill(); break;
     case '1': c.fillStyle = '#5a3418'; c.beginPath(); c.ellipse(x, y + 10, 14, 16, 0, Math.PI, 0); c.fill(); c.fillStyle = '#160c05'; c.beginPath(); c.ellipse(x, y + 10, 8, 10, 0, Math.PI, 0); c.fill(); break;
     case 'H': c.fillStyle = '#3ddc68'; rr(x - 13, y - 9, 26, 18, 4); c.fill(); text('⌂', x, y + 6, 16); break;
@@ -209,11 +216,11 @@ export function drawEditor(api: EditorApi, dt: number): void {
   // palette
   ctx.fillStyle = 'rgba(10,20,36,.94)'; ctx.fillRect(0, H - BOT, W, BOT);
   for (let i = 0; i < TOOLS.length; i++) {
-    const x = 20 + i * 40, y = H - BOT + 8;
-    ctx.fillStyle = i === tool ? '#ffd23f' : 'rgba(255,255,255,.1)'; rr(x + 1, y, 38, 38, 8); ctx.fill();
-    if (i === tool) { ctx.fillStyle = '#16314f'; rr(x + 4, y + 3, 32, 32, 6); ctx.fill(); }
-    icon(TOOLS[i].ch, x + 20, y + 19);
-    REG.push({ x, y: H - BOT, w: 40, h: BOT, fn: () => { tool = i; } });
+    const x = 7 + i * 35, y = H - BOT + 8;
+    ctx.fillStyle = i === tool ? '#ffd23f' : 'rgba(255,255,255,.1)'; rr(x + 1, y, 33, 38, 8); ctx.fill();
+    if (i === tool) { ctx.fillStyle = '#16314f'; rr(x + 3, y + 3, 29, 32, 6); ctx.fill(); }
+    ctx.save(); ctx.translate(x + 17, y + 19); ctx.scale(0.88, 0.88); icon(TOOLS[i].ch, 0, 0); ctx.restore();
+    REG.push({ x, y: H - BOT, w: 35, h: BOT, fn: () => { tool = i; } });
   }
   text(TOOLS[tool].tip, W / 2, H - 5, 12, 'rgba(255,255,255,.85)');
   if (toastT > 0) { toastT -= dt; ctx.globalAlpha = Math.min(1, toastT * 2); ctx.fillStyle = 'rgba(0,0,0,.7)'; rr(W / 2 - 300, TOP + 12, 600, 40, 12); ctx.fill(); text(toast, W / 2, TOP + 39, 19, '#fff36b'); ctx.globalAlpha = 1; }

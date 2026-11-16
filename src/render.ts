@@ -1,4 +1,4 @@
-import { H, R, T, W, type EggType, type Sim } from './core/types';
+import { H, R, T, W, type EggType, type PetKind, type Sim } from './core/types';
 import { gateOpen, solidAt } from './core/sim';
 import { on } from './core/events';
 import { SV } from './core/save';
@@ -9,9 +9,17 @@ export const EGGS: Record<EggType, { name: string; col: string; spot: string; ti
   spark: { name: 'Spark Egg', col: '#fff3a0', spot: '#ff8a1f', tip: 'Spark Egg: you roll FASTER!' },
   stone: { name: 'Stone Egg', col: '#d6d0c4', spot: '#7d776d', tip: 'Stone Egg: smash cracked rocks and bugs!' },
 };
+export const ABIL: Record<PetKind, { icon: string; name: string; tip: string }> = {
+  magnet: { icon: '🧲', name: 'Star magnet', tip: 'Pulls stars to you' },
+  heart: { icon: '❤', name: 'Extra heart', tip: 'Saves you from one hit' },
+  dash: { icon: '⚡', name: 'Super dash', tip: 'Longer dash, ready sooner' },
+};
+export const petKind = (i: number): PetKind => (['magnet', 'heart', 'dash'] as const)[i % 3];
 export const PETS = [
   { name: 'Pip', col: '#ffd84a' }, { name: 'Flit', col: '#7fd0ff' }, { name: 'Zap', col: '#ffb300' }, { name: 'Rocky', col: '#b5aea3' },
   { name: 'Blaze', col: '#ff6b4a' }, { name: 'Mossy', col: '#7ed957' }, { name: 'Nox', col: '#a78bfa' }, { name: 'Coco', col: '#c98a4f' },
+  { name: 'Twig', col: '#9ccc65' }, { name: 'Boing', col: '#ff8fb0' }, { name: 'Digger', col: '#b08968' }, { name: 'Flash', col: '#ffe066' },
+  { name: 'Sky', col: '#8ecae6' }, { name: 'Luna', col: '#cdb4db' }, { name: 'Queenie', col: '#ffd700' },
 ];
 export const TH = [
   { sky: ['#3fa9ff', '#c9f1ff'], far: '#8fd6a6', mid: '#5fbf74', near: '#3da35a', dirt: '#8b5a36', dark: '#6e4426', grass: '#4ccb4f', lite: '#8df07a', deco: 'flower', sun: '#fff2a8' },
@@ -160,6 +168,18 @@ export function drawWorld(S: Sim, o: WorldOpts = {}): void {
       ctx.fillStyle = '#f6ead2'; ctx.fillRect(px + 42, py - 2, 3, 42); ctx.fillStyle = bc; ctx.beginPath(); ctx.moveTo(px + 45, py - 2); ctx.lineTo(px + 62, py + 5); ctx.lineTo(px + 45, py + 12); ctx.fill();
       continue;
     }
+    if (c === 'S' || c === 'Z') {
+      const d = c === 'S' ? 1 : -1, cx = px + 20, by = py + T, act = S.cat && S.cat.x === cx && S.cat.y === by ? S.cat : null, fl = !act && S.catAnim > 0 && Math.abs(S.px - cx) < 400;
+      const lowY = by - 5, highY = by - 40, ax = cx - d * 22, bx = cx + d * 84;
+      ctx.fillStyle = '#6e4426'; ctx.beginPath(); ctx.moveTo(cx + d * 30 - 12, by); ctx.lineTo(cx + d * 30, by - 22); ctx.lineTo(cx + d * 30 + 12, by); ctx.fill();
+      ctx.strokeStyle = '#3d220f'; ctx.lineWidth = 9; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(ax, fl ? highY : lowY); ctx.lineTo(bx, fl ? lowY : highY); ctx.stroke();
+      ctx.strokeStyle = '#d9a15c'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(ax, fl ? highY : lowY); ctx.lineTo(bx, fl ? lowY : highY); ctx.stroke(); ctx.lineCap = 'butt';
+      const ry0 = by - 150, ry = fl ? lowY - 16 : act ? ry0 + (highY - 16 - ry0) * Math.min(1, 1 - act.t / 0.45) ** 2 : ry0 + Math.sin(t * 2 + x) * 3, rx = cx + d * 74;
+      if (!act && !fl) { ctx.strokeStyle = 'rgba(60,40,20,.7)'; ctx.lineWidth = 2; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(rx, ry + 14); ctx.lineTo(rx, highY - 6); ctx.stroke(); ctx.setLineDash([]); }
+      circ(rx, ry, 16, '#4e555c'); circ(rx, ry, 14, '#8d959e'); circ(rx - 5, ry - 5, 4, '#b9c0c8');
+      ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.moveTo(cx - d * 8, by - 34); ctx.lineTo(cx + d * 8, by - 44); ctx.lineTo(cx - d * 8, by - 54); ctx.fill();
+      continue;
+    }
     if (c === 'g') { const go = gateOpen(S, x); ctx.globalAlpha = go ? 0.15 : 0.55 + 0.25 * Math.sin(t * 8 + y); ctx.fillStyle = go ? '#7dff8a' : '#ff4d6d'; ctx.fillRect(px + 15, py, 10, T); ctx.fillStyle = '#fff'; ctx.fillRect(px + 19, py, 2, T); ctx.globalAlpha = 1; if (y + 1 < S.rows && S.g[y + 1][x] !== 'g') { ctx.fillStyle = '#2b3442'; rr(px + 8, py + 30, 24, 10, 4); ctx.fill(); } if (!go && y % 6 === 5) { circ(px + 20, py + 20, 15, '#2b3442'); text('🔒', px + 20, py + 27, 17); } continue; }
     if (c === '#') { groundTile(P, px, py, x, y, y === 0 || !sol(x, y - 1), x > 0 && !sol(x - 1, y), x < S.cols - 1 && !sol(x + 1, y)); continue; }
     if (c === 'R') {
@@ -185,6 +205,23 @@ export function drawWorld(S: Sim, o: WorldOpts = {}): void {
   }
   for (const p of S.plats) { ctx.fillStyle = 'rgba(0,0,0,.25)'; rr(p.cx, p.cy + 4, p.w, 14, 7); ctx.fill(); ctx.fillStyle = '#4b5a70'; rr(p.cx, p.cy, p.w, 14, 7); ctx.fill(); ctx.fillStyle = '#ffd23f'; for (let l = 6; l < p.w - 10; l += 18) { ctx.beginPath(); ctx.moveTo(p.cx + l, p.cy + 3); ctx.lineTo(p.cx + l + 8, p.cy + 3); ctx.lineTo(p.cx + l + 4, p.cy + 11); ctx.lineTo(p.cx + l - 4, p.cy + 11); ctx.fill(); } if (ed) { ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.setLineDash([6, 6]); ctx.lineWidth = 2; ctx.strokeRect(p.x0 + Math.min(0, p.ax), p.y0 + Math.min(0, p.ay), p.w + Math.abs(p.ax), 14 + Math.abs(p.ay)); ctx.setLineDash([]); } }
   for (const c of S.crates) { ctx.fillStyle = 'rgba(0,0,0,.25)'; rr(c.x + 2, c.y + 4, 36, 36, 5); ctx.fill(); ctx.fillStyle = '#c98a4f'; rr(c.x, c.y, 36, 36, 5); ctx.fill(); ctx.strokeStyle = '#7a4a26'; ctx.lineWidth = 3; rr(c.x + 1.5, c.y + 1.5, 33, 33, 4); ctx.stroke(); ctx.beginPath(); ctx.moveTo(c.x + 5, c.y + 5); ctx.lineTo(c.x + 31, c.y + 31); ctx.moveTo(c.x + 31, c.y + 5); ctx.lineTo(c.x + 5, c.y + 31); ctx.stroke(); ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.fillRect(c.x + 5, c.y + 4, 26, 3); }
+  for (const sp of S.spawners) { // a hollow stump the logs roll out of
+    ctx.fillStyle = '#5a3418'; rr(sp.x - 22, sp.y - 24, 44, 44, 10); ctx.fill(); ctx.fillStyle = '#7a4a26'; rr(sp.x - 19, sp.y - 21, 38, 38, 8); ctx.fill();
+    circ(sp.x, sp.y - 2, 13, '#1c0f06'); ctx.strokeStyle = '#c99657'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(sp.x, sp.y - 2, 15, 0, 7); ctx.stroke();
+    ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.moveTo(sp.x + sp.dir * 30, sp.y - 2); ctx.lineTo(sp.x + sp.dir * 20, sp.y - 9); ctx.lineTo(sp.x + sp.dir * 20, sp.y + 5); ctx.fill();
+  }
+  for (const l of S.logs) {
+    ctx.save(); ctx.translate(l.x, l.y); ctx.rotate((l.x / 15) % 6.283); circ(0, 0, 15, '#5a3418'); circ(0, 0, 12.5, '#b07a45'); ctx.strokeStyle = '#7a4a26'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, 7, 0, 7); ctx.moveTo(0, -12); ctx.lineTo(0, 12); ctx.stroke(); circ(0, 0, 2.5, '#7a4a26'); ctx.restore();
+  }
+  for (const m of S.moles) {
+    const up = m.st === 2 ? Math.min(1, (1.1 - m.t) * 8, m.t * 8) : 0;
+    if (up > 0) { const my = m.y - 26 * up; ctx.fillStyle = '#4a3728'; ctx.beginPath(); ctx.ellipse(m.x, my + 14, 14, 20, 0, Math.PI, 0); ctx.fill(); ctx.fillRect(m.x - 14, my + 14, 28, m.y - my - 14);
+      ctx.fillStyle = '#e8b04a'; ctx.beginPath(); ctx.ellipse(m.x, my + 2, 15, 9, 0, Math.PI, 0); ctx.fill(); ctx.fillRect(m.x - 17, my, 34, 4);
+      circ(m.x - 5, my + 8, 2.5, '#fff'); circ(m.x + 5, my + 8, 2.5, '#fff'); circ(m.x - 5, my + 8, 1.2, '#111'); circ(m.x + 5, my + 8, 1.2, '#111'); circ(m.x, my + 14, 3.5, '#ff8fa8'); }
+    ctx.fillStyle = '#5a3418'; ctx.beginPath(); ctx.ellipse(m.x, m.y, 20, m.st === 1 ? 9 + Math.sin(t * 40) * 2 : 8, 0, Math.PI, 0); ctx.fill(); ctx.fillStyle = '#1c0f06'; ctx.beginPath(); ctx.ellipse(m.x, m.y, 11, 4, 0, Math.PI, 0); ctx.fill();
+    if (m.st === 1) text('!', m.x, m.y - 22, 26, '#ff3b3b', 'center', '#fff');
+    if (ed) text('zz', m.x + 14, m.y - 14, 12);
+  }
   for (const r of S.rollers) {
     const mx = (r.x0 + r.x1) / 2; if (mx < S.cam - 100 || mx > S.cam + W + 100 || S.hasEgg) continue;
     ctx.fillStyle = '#566273'; ctx.fillRect(r.x0 - 6, r.y - 70, 5, 70); ctx.fillRect(r.x1 + 1, r.y - 70, 5, 70);
@@ -207,7 +244,7 @@ export function drawWorld(S: Sim, o: WorldOpts = {}): void {
   }
   if (!S.hasEgg || ed) { ctx.fillStyle = '#5a3a1e'; ctx.beginPath(); ctx.ellipse(S.ex, S.erow * T - 2, 26, 10, 0, 0, Math.PI, true); ctx.fill(); const eg = ctx.createRadialGradient(S.ex, S.ey, 4, S.ex, S.ey, 50); eg.addColorStop(0, 'rgba(255,255,220,.6)'); eg.addColorStop(1, 'rgba(255,255,220,0)'); ctx.fillStyle = eg; ctx.beginPath(); ctx.arc(S.ex, S.ey, 50, 0, 7); ctx.fill(); drawEgg(S.ex, S.ey + Math.sin(t * 3) * 2, 1.25, S.egg); }
   // the guardian owl: bigger and redder the faster it is
-  const awake = S.hasEgg && S.wake <= 0 && !ed, king = S.lv.guard.max >= 270, gs = 1 + Math.max(0, S.lv.guard.max - 220) / 170;
+  const awake = S.hasEgg && S.wake <= 0 && !ed, king = !!S.lv.boss, gs = king ? 1.55 : 1 + Math.max(0, S.lv.guard.max - 220) / 170;
   ctx.save(); ctx.translate(S.gx, S.gy + (awake ? Math.sin(t * 12) * 3 : 0)); ctx.scale(gs, gs);
   if (awake) { const fw = Math.sin(t * 16) * 10; ctx.fillStyle = king ? '#8a1f2a' : '#573bb0'; ctx.beginPath(); ctx.ellipse(-30, -4 + fw * 0.4, 14, 9, -0.5 + fw * 0.03, 0, 7); ctx.ellipse(30, -4 + fw * 0.4, 14, 9, 0.5 - fw * 0.03, 0, 7); ctx.fill(); }
   ctx.fillStyle = '#20143d'; rr(-26, -26, 52, 52, 14); ctx.fill(); ctx.fillStyle = king ? '#c2333f' : '#7a56e0'; rr(-24, -24, 48, 48, 12); ctx.fill();
@@ -223,8 +260,11 @@ export function drawWorld(S: Sim, o: WorldOpts = {}): void {
     if (S.ground) { ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.beginPath(); ctx.ellipse(S.px, S.py + R, 15, 4, 0, 0, 7); ctx.fill(); }
     if (S.phase === 'home' || S.phase === 'win') drawEgg(HM.x, HM.y - 22, 1.3, S.egg); else if (S.hasEgg) drawEgg(S.px, S.py - R - 13, 1, S.egg);
     const party = S.phase === 'home' || S.phase === 'win';
+    if (S.buddy) drawPet(S.px - S.face * 34 + (party ? 46 : 0), S.py - 34, 0.7, S.buddy.idx, S.buddy.shiny, t);
+    if (S.inv > 0 && Math.floor(t * 14) % 2) ctx.globalAlpha = 0.35;
     drawRolo(S.px + (party ? 46 : 0), S.py - (party ? Math.abs(Math.sin(t * 9)) * 22 : 0), S.rot, S.vx < -5 ? -1 : S.vx > 5 ? 1 : S.face,
       S.turboT > 0 ? 'rgba(255,170,40,.9)' : S.dashT > 0 ? 'rgba(255,240,120,.9)' : S.inFan ? 'rgba(160,235,255,.6)' : null, S.ground ? 0 : Math.max(-0.12, Math.min(0.12, -S.vy / 6000)));
+    ctx.globalAlpha = 1;
   }
   for (let i = FX.length - 1; i >= 0; i--) { const f = FX[i]; f.t -= 1 / 60; if (f.t <= 0) { FX.splice(i, 1); continue; } f.x += f.vx / 60; f.y += f.vy / 60; f.vy += 12; ctx.globalAlpha = Math.min(1, f.t * 3); circ(f.x, f.y, f.s * 0.6, f.col); }
   ctx.globalAlpha = 1; ctx.restore();
@@ -232,7 +272,9 @@ export function drawWorld(S: Sim, o: WorldOpts = {}): void {
   const vg = ctx.createRadialGradient(W / 2, H / 2, 260, W / 2, H / 2, 620); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,20,.32)'); ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
   // HUD
   ctx.fillStyle = 'rgba(0,0,0,.45)'; rr(12, 12, 104, 36, 12); ctx.fill(); drawStar(34, 30, 12, '#ffe14a'); text(`${S.nStars}/${S.stars.length}`, 54, 37, 19, '#fff', 'left');
-  if (S.dash) { ctx.fillStyle = 'rgba(0,0,0,.45)'; rr(126, 12, 74, 36, 12); ctx.fill(); ctx.fillStyle = S.dashCd > 0 ? 'rgba(255,224,102,.35)' : '#ffe066'; rr(132, 19, 62 * (1 - Math.max(0, S.dashCd) / 1.8), 22, 6); ctx.fill(); text('⚡', 163, 37, 17, '#333'); }
+  if (S.dash) { ctx.fillStyle = 'rgba(0,0,0,.45)'; rr(126, 12, 74, 36, 12); ctx.fill(); ctx.fillStyle = S.dashCd > 0 ? 'rgba(255,224,102,.35)' : '#ffe066'; rr(132, 19, 62 * (1 - Math.max(0, S.dashCd) / S.dashCdMax), 22, 6); ctx.fill(); text('⚡', 163, 37, 17, '#333'); }
+  if (S.buddy?.kind === 'heart') for (let i = 0; i < (S.buddy.shiny ? 2 : 1); i++) text('❤', 30 + i * 26, 78, 22, i < S.hearts ? '#ff4d6d' : 'rgba(0,0,0,.4)');
+  if (S.lv.boss && S.hasEgg) { ctx.fillStyle = 'rgba(0,0,0,.5)'; rr(W / 2 - 110, 116, 220, 30, 12); ctx.fill(); text('MAMA OWL', W / 2 - 50, 137, 15, '#fff'); for (let i = 0; i < 3; i++) text('♥', W / 2 + 30 + i * 26, 139, 22, i < S.bossHp ? '#ff4d6d' : 'rgba(255,255,255,.25)'); }
   // progress track: home ... egg (straight-line distance, so it also works in vertical levels)
   const tx0 = 250, tw = 440, ty = 30, full = Math.hypot(S.ex - HM.x, S.ey - HM.y) || 1, frac = (x: number, y: number) => tx0 + tw * Math.max(0, Math.min(1, 1 - Math.hypot(S.ex - x, S.ey - y) / full));
   ctx.fillStyle = 'rgba(0,0,0,.45)'; rr(tx0 - 26, 12, tw + 52, 36, 18); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,.3)'; rr(tx0, ty - 3, tw, 6, 3); ctx.fill();

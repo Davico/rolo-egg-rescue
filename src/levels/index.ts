@@ -8,5 +8,12 @@ import l4 from './w1/w1-05.json';
 import l5 from './w1/w1-06.json';
 import l6 from './w1/w1-07.json';
 import l7 from './w1/w1-08.json';
+import l8 from './w1/w1-09.json';
+import l9 from './w1/w1-10.json';
+import l10 from './w1/w1-11.json';
+import l11 from './w1/w1-12.json';
+import l12 from './w1/w1-13.json';
+import l13 from './w1/w1-14.json';
+import l14 from './w1/w1-15.json';
 
-export const WORLD1 = [l0, l1, l2, l3, l4, l5, l6, l7] as LevelData[];
+export const WORLD1 = [l0, l1, l2, l3, l4, l5, l6, l7, l8, l9, l10, l11, l12, l13, l14] as LevelData[];

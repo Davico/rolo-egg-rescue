@@ -5,10 +5,10 @@ import { SV, jmpLv, save, spdLv } from './core/save';
 import { WORLD1 } from './levels/index';
 import { music, setMute, sfx, unlock } from './audio';
 import { REG, button, clearFx, drawWorld, initRender } from './render';
-import { drawHatch, drawMenu, unlocked, type Hatch } from './ui';
+import { buddy, drawHatch, drawMenu, drawPets, unlocked, type Hatch } from './ui';
 import { drawEditor, editorKey, editorPointer, editorToast, editorWheel, openEditor } from './editor';
 
-type Mode = 'menu' | 'play' | 'hatch' | 'editor';
+type Mode = 'menu' | 'play' | 'hatch' | 'editor' | 'pets';
 const LEVELS = WORLD1, DT = 1 / 120;
 const cv = document.getElementById('c') as HTMLCanvasElement;
 initRender(cv);
@@ -21,12 +21,13 @@ function setMode(m: Mode): void {
   mode = m; input.l = input.r = input.j = input.jPressed = input.dPressed = false;
   document.body.classList.toggle('play', m === 'play');
   document.body.classList.toggle('dash', m === 'play' && !!S?.dash);
-  if (m === 'menu') music('calm', 0); else if (m === 'editor') music('off');
+  if (m === 'menu' || m === 'pets') music('calm', 0); else if (m === 'editor') music('off');
 }
-function begin(lv: LevelData): void { clearFx(); S = createSim(lv, { spd: spdLv(), jmp: jmpLv(), dash: SV.dash }); setMode('play'); }
+function begin(lv: LevelData): void { clearFx(); S = createSim(lv, { spd: spdLv(), jmp: jmpLv(), dash: SV.dash, buddy: buddy(LEVELS) }); setMode('play'); }
 function startLevel(i: number): void { if (!unlocked(LEVELS, i)) return; cur = i; testing = null; sfx('click'); begin(LEVELS[i]); }
 function testLevel(lv: LevelData): void { testing = lv; sfx('click'); begin(lv); }
 function toMenu(): void { sfx('click'); setMode('menu'); }
+function toPets(): void { sfx('click'); setMode('pets'); }
 function toEditor(): void { sfx('click'); openEditor(); setMode('editor'); }
 function leavePlay(): void { if (testing) { openEditor(); setMode('editor'); } else setMode('menu'); }
 
@@ -36,6 +37,7 @@ function finish(s: Sim): void {
   const r3 = rate >= 0.99 ? 3 : rate >= 0.6 ? 2 : rate >= 0.25 ? 1 : 0;
   if (SV.best[lv.id] == null || r3 > SV.best[lv.id]) SV.best[lv.id] = r3;
   SV.pets[lv.id] = prev === 's' || shiny ? 's' : 'n';
+  if (!SV.buddy) SV.buddy = lv.id; // the first pet comes along right away, so its help is felt without a trip to the menu
   const dashNew = !SV.dash && cur >= 2; if (dashNew) SV.dash = true;
   hatch = { idx: cur, lv, shiny, first: !prev, upgraded: shiny && prev === 'n', r3, n: s.nStars, of: s.stars.length, t: 0, dashNew };
   save(); setMode('hatch'); music('off'); sfx('hatch');
@@ -57,9 +59,10 @@ function draw(dt: number): void {
   if (mode === 'play' && S) {
     drawWorld(S, { title: S.lv.name });
     button(900, 12, 48, 36, testing ? '✎' : '☰', 'rgba(20,30,50,.75)', () => { sfx('click'); leavePlay(); }, 18);
-  } else if (mode === 'hatch' && hatch) { hatch.t += dt; drawHatch(hatch, { levels: LEVELS, menu: toMenu, play: startLevel }); }
+  } else if (mode === 'hatch' && hatch) { hatch.t += dt; drawHatch(hatch, { levels: LEVELS, menu: toMenu, play: startLevel, pets: toPets }); }
+  else if (mode === 'pets') drawPets({ levels: LEVELS, back: toMenu, pick: (id) => { SV.buddy = id; save(); sfx(id ? 'star' : 'click'); } });
   else if (mode === 'editor') drawEditor({ test: testLevel, menu: toMenu }, dt);
-  else drawMenu({ levels: LEVELS, wheelsTotal, play: startLevel, editor: toEditor, mute: () => { SV.mute = !SV.mute; setMute(SV.mute); save(); } });
+  else drawMenu({ levels: LEVELS, wheelsTotal, play: startLevel, editor: toEditor, pets: toPets, mute: () => { SV.mute = !SV.mute; setMute(SV.mute); save(); } });
 }
 
 // ---------- input ----------
@@ -72,7 +75,7 @@ function key(e: KeyboardEvent, down: boolean): void {
   else if (k === 'ArrowRight' || k === 'd') input.r = down;
   else if (k === 'ArrowUp' || k === 'w' || k === ' ') { if (down && !input.j && mode === 'play') input.jPressed = true; input.j = down; }
   else if (k === 'x' || k === 'Shift') { if (down && !e.repeat) input.dPressed = mode === 'play'; }
-  else if (k === 'Escape') { if (down && mode === 'play') leavePlay(); else if (down && mode === 'hatch') setMode('menu'); }
+  else if (k === 'Escape') { if (down && mode === 'play') leavePlay(); else if (down && (mode === 'hatch' || mode === 'pets')) setMode('menu'); }
   else return;
   e.preventDefault();
 }
@@ -118,6 +121,6 @@ setMode('menu'); requestAnimationFrame(frame);
 
 // Hooks for automated screenshots and playtests.
 (window as unknown as Record<string, unknown>).__game = {
-  S: () => S, mode: () => mode, start: startLevel, editor: toEditor, SV, LEVELS, input,
+  S: () => S, mode: () => mode, pets: toPets, start: startLevel, editor: toEditor, SV, LEVELS, input,
   unlockAll: () => { for (const l of LEVELS) SV.best[l.id] ??= 0; }, tick: (n: number) => { if (S) for (let i = 0; i < n; i++) step(S, input, DT); }, hatchSkip: () => { if (hatch) hatch.t = 3; },
 };

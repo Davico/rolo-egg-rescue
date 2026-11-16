@@ -1,9 +1,9 @@
 import type { LevelData } from './types';
 
-export interface Save { best: Record<string, number>; pets: Record<string, 'n' | 's'>; wheels: Record<string, 1>; dash: boolean; mute: boolean }
+export interface Save { best: Record<string, number>; pets: Record<string, 'n' | 's'>; wheels: Record<string, 1>; dash: boolean; mute: boolean; buddy: string | null }
 
 const KEY = 'rolo_v4', KEY_LEVELS = 'rolo_levels';
-const blank = (): Save => ({ best: {}, pets: {}, wheels: {}, dash: false, mute: false });
+const blank = (): Save => ({ best: {}, pets: {}, wheels: {}, dash: false, mute: false, buddy: null });
 
 function read<T>(key: string): T | null { try { const t = localStorage.getItem(key); return t ? (JSON.parse(t) as T) : null; } catch { return null; } }
 function write(key: string, v: unknown): void { try { localStorage.setItem(key, JSON.stringify(v)); } catch { /* storage can be unavailable: play on without saving */ } }
