@@ -89,7 +89,8 @@ function rollout(base: Sim, C: Ctx, a: [number, number, number], b: [number, num
   const S = structuredClone(base), inp: Input = { l: false, r: false, j: false, jPressed: false, dPressed: false }, tries = S.tries;
   let t = 0, sc = -1e9, ph = 0;
   for (const [act, n] of [[a, n1], [b, n2], [b[2] ? ACTS[0] : ([b[0], 0, 0] as [number, number, number]), n3]] as const) { for (let i = 0; i < n; i++) {
-    apply(inp, act as [number, number, number], i === 0); step(S, inp, DT); t++;
+    apply(inp, act as [number, number, number], i === 0); if (ph === 2 && S.ground && !act[2]) { inp.l = false; inp.r = false; }  // once landed, stop: the tail only checks the landing
+    step(S, inp, DT); t++;
     if (S.tries !== tries || S.py > (S.rows - 1.4) * T) return -1e8 + t;  // died or fell into a pit: later is better
     if (S.phase === 'home' || S.phase === 'win') return 1e9 - t;
     // the tail only has to prove the move lands somewhere good: keep the best place we stood on
@@ -104,7 +105,7 @@ function puzzle(S: Sim): [number, number, number] | null {
   // training wheel: stay on it and keep running until it launches; if we slipped past it to the locked gate, go back
   for (const r of S.rollers) {
     if (r.charge >= 1 || r.gate < 0 || Math.abs(S.py + 16 - r.y) > 60) continue;
-    if (S.px >= r.x0 - 4 && S.px <= r.x1 + 4) return [S.px > r.x1 - 10 ? 0 : 1, 0, 0];
+    if (S.px >= r.x0 - 4 && S.px <= r.x1 + 4) return [1, 0, 0];
     if (S.px > r.x1 && S.px < r.gate * T + 20) return [-1, 0, 0];
   }
   // crate as a step: a wall 3 tiles high with a crate left behind -> go back and push it to the wall
